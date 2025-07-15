@@ -17,7 +17,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body suppressHydrationWarning className={inter.className}>
+
         <Navbar />
         <div className="pt-16"> {/* Add padding-top to account for fixed navbar */}
           {children}
