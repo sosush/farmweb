@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapPin, TrendingUp, Truck, IndianRupee, Star, Lightbulb, Loader2 } from 'lucide-react';
 import { MarketInfo, VehicleInfo, SeasonalPattern, LocationData } from '../types/market';
 import { getCoordinates, calculateDistance } from '../utils/geocoding';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 interface MarketRecommendationsProps {
   markets: MarketInfo[];
@@ -42,53 +43,139 @@ export const MarketRecommendations: React.FC<MarketRecommendationsProps> = ({
 
   useEffect(() => {
     const fetchGeminiSuggestion = async () => {
-      if (!markets.length || !seasonalPatterns.length) return;
+      // Check if we have the minimum required data
+      if (!variety) {
+        setGeminiSuggestion('Please select a crop variety to get AI recommendations.');
+        return;
+      }
+
       setLoadingSuggestion(true);
       setSuggestionError(null);
       setGeminiSuggestion('');
 
       try {
-        const overallMarketText = `Overall best markets: ${markets.map(m => `${m.market} (High: ₹${m.highPrice})`).join(', ')}.`;
-        const stateMarketText = bestStateMarkets.length > 0 ? `Top markets in the state: ${bestStateMarkets.map(m => `${m.market} (High: ₹${m.highPrice})`).join(', ')}.` : '';
-        const seasonalText = `Seasonal trends: ${seasonalPatterns.map(p => `${p.month} (${p.recommendation})`).join(', ')}.`;
+        // Build context from available data
+        const overallMarketText = markets.length > 0 
+          ? `Overall best markets: ${markets.slice(0, 3).map(m => `${m.market} (High: ₹${m.highPrice})`).join(', ')}.`
+          : 'Market data is being analyzed.';
+        
+        const stateMarketText = bestStateMarkets.length > 0 
+          ? `Top markets in the state: ${bestStateMarkets.slice(0, 3).map(m => `${m.market} (High: ₹${m.highPrice})`).join(', ')}.`
+          : '';
+        
+        const seasonalText = seasonalPatterns.length > 0 
+          ? `Seasonal trends: ${seasonalPatterns.slice(0, 6).map(p => `${p.month} (${p.recommendation})`).join(', ')}.`
+          : 'Seasonal analysis is being processed.';
+
+        const locationText = userLocation?.state ? `in ${userLocation.state}` : 'in your region';
+
         const prompt = `
-          Given the following data for ${variety} in the region of ${userLocation?.state || 'this area'}:
+          As an agricultural market expert, provide comprehensive farming and marketing advice for ${variety} ${locationText}.
+
+          Available market data:
           1. ${overallMarketText}
           2. ${stateMarketText}
           3. ${seasonalText}
 
-          First, provide a concise (2-3 sentences) overall market strategy for a farmer.
-          
-          Then, provide a detailed, point-wise list of 5-8 actionable recommendations under the heading "Additional Detailed Recommendations:".
-          These should be tailored to ${variety} and cover topics like market diversification, storage, value-added products, harvesting techniques, pest management, precision agriculture, cooperative marketing, and government schemes.
-          
-          Format the output exactly as follows:
-          [Your 2-3 sentence summary here]
-          
-          Additional Detailed Recommendations:
-          1. **[Title of Recommendation 1]:** [Description of recommendation 1].
-          2. **[Title of Recommendation 2]:** [Description of recommendation 2].
-          ...and so on.
+          Please provide:
+          1. A brief market strategy summary (2-3 sentences)
+          2. Detailed actionable recommendations covering:
+             - Market timing and price optimization
+             - Storage and post-harvest handling
+             - Value addition opportunities
+             - Risk management strategies
+             - Government schemes and support
+             - Cooperative marketing benefits
+
+          Format your response clearly with the summary first, followed by numbered recommendations.
         `;
 
-        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyBdcfzUa9q2FFZoslweResfdsYcpj0J0nI', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }]
-          })
-        });
-        const data = await response.json();
-        const suggestion = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'No AI suggestion available.';
-        setGeminiSuggestion(suggestion);
+        // Try direct API call first (more reliable for development)
+        let suggestion = '';
+        
+        try {
+          console.log('Attempting Gemini API call...');
+          const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyBdcfzUa9q2FFZoslweResfdsYcpj0J0nI', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }]
+            })
+          });
+          
+          console.log('API Response status:', response.status);
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('API Error Response:', errorText);
+            throw new Error(`API request failed: ${response.status} - ${errorText}`);
+          }
+          
+          const data = await response.json();
+          console.log('API Response data:', data);
+          
+          suggestion = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          
+          if (!suggestion) {
+            console.warn('Empty suggestion from API response');
+            throw new Error('Empty response from AI service');
+          }
+          
+          console.log('Successfully got AI suggestion');
+        } catch (apiError) {
+          console.error('Direct API call failed, trying SDK approach:', apiError);
+          
+          // Fallback to SDK approach if available
+          const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+          if (apiKey) {
+            console.log('Trying GoogleGenerativeAI SDK...');
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            suggestion = response.text();
+            console.log('SDK approach successful');
+          } else {
+            console.log('No environment API key available, re-throwing error');
+            throw apiError;
+          }
+        }
+        
+        if (suggestion && suggestion.trim()) {
+          setGeminiSuggestion(suggestion);
+        } else {
+          throw new Error('Empty response from AI service');
+        }
       } catch (err) {
-        setSuggestionError('Failed to fetch AI suggestion.');
+        console.error('Gemini API Error:', err);
+        
+        // Provide fallback suggestions based on available data
+        const fallbackSuggestion = `
+Market Strategy for ${variety}:
+Based on available data, focus on timing your sales during peak price periods and consider diversifying your market channels. ${markets.length > 0 ? `Current top markets show prices ranging from ₹${Math.min(...markets.map(m => m.lowPrice || 0))} to ₹${Math.max(...markets.map(m => m.highPrice || 0))}.` : ''}
+
+Key Recommendations:
+1. **Market Timing**: Monitor seasonal price patterns and plan harvests accordingly
+2. **Quality Management**: Implement proper post-harvest handling to reduce losses
+3. **Market Diversification**: Don't rely on a single market - explore multiple channels
+4. **Storage Solutions**: Invest in proper storage to take advantage of price fluctuations
+5. **Cooperative Marketing**: Join farmer groups for better bargaining power
+6. **Value Addition**: Consider processing or packaging to increase profit margins
+7. **Government Schemes**: Explore available subsidies and support programs
+8. **Risk Management**: Consider crop insurance and forward contracts where available
+
+Note: AI service temporarily unavailable. These are general recommendations based on market data.
+        `;
+        
+        setGeminiSuggestion(fallbackSuggestion);
+        setSuggestionError('Using fallback recommendations. AI service may be temporarily unavailable.');
       } finally {
         setLoadingSuggestion(false);
       }
     };
+
     fetchGeminiSuggestion();
-  }, [markets, bestStateMarkets, seasonalPatterns, variety]);
+  }, [markets, bestStateMarkets, seasonalPatterns, variety, userLocation]);
 
   useEffect(() => {
     const processMarkets = async () => {
@@ -187,7 +274,7 @@ export const MarketRecommendations: React.FC<MarketRecommendationsProps> = ({
     return (
       <div className="bg-white rounded-xl shadow-lg p-6 flex items-center justify-center">
         <Loader2 className="animate-spin mr-2" size={20} />
-        <span>Calculating exact distances to markets...</span>
+        <span className="text-gray-900 font-medium">Calculating exact distances to markets...</span>
       </div>
     );
   }
@@ -251,8 +338,8 @@ export const MarketRecommendations: React.FC<MarketRecommendationsProps> = ({
               <div className="flex items-center">
                 <Truck className="mr-2 text-blue-600" size={16} />
                 <div>
-                  <p className="text-gray-600">Distance</p>
-                  <p className="font-medium">
+                  <p className="text-gray-700 font-medium">Distance</p>
+                  <p className="font-bold text-gray-900">
                     {market.distance !== null ? `${Math.round(market.distance)} km` : 'N/A'}
                   </p>
                 </div>
@@ -260,15 +347,15 @@ export const MarketRecommendations: React.FC<MarketRecommendationsProps> = ({
               <div className="flex items-center">
                 <IndianRupee className="mr-2 text-orange-600" size={16} />
                 <div>
-                  <p className="text-gray-600">Transport Cost</p>
-                  <p className="font-medium">₹{market.transportCost}</p>
+                  <p className="text-gray-700 font-medium">Transport Cost</p>
+                  <p className="font-bold text-gray-900">₹{market.transportCost}</p>
                 </div>
               </div>
               <div className="flex items-center">
                 <TrendingUp className="mr-2 text-purple-600" size={16} />
                 <div>
-                  <p className="text-gray-600">Market Activity</p>
-                  <p className="font-medium">{market.arrivals.toFixed(1)}T</p>
+                  <p className="text-gray-700 font-medium">Market Activity</p>
+                  <p className="font-bold text-gray-900">{market.arrivals.toFixed(1)}T</p>
                 </div>
               </div>
             </div>

@@ -83,27 +83,27 @@ export const VehicleInfoInput: React.FC<VehicleInfoInputProps> = ({
 
           <div>
             <p className="text-sm font-medium text-gray-700 mb-2">Quick Select Vehicle Type:</p>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
               {commonVehicles.map((vehicle) => (
                 <button
                   key={vehicle.name}
                   onClick={() => handleMileageChange(vehicle.mileage)}
-                  className="p-2 text-sm border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                  className="p-4 text-base border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors flex flex-col items-center justify-center space-y-1"
                 >
-                  <div className="font-medium">{vehicle.name}</div>
-                  <div className="text-xs text-gray-600">{vehicle.mileage} km/l</div>
+                  <div className="font-semibold">{vehicle.name}</div>
+                  <div className="text-sm text-gray-600">{vehicle.mileage} km/l</div>
                 </button>
               ))}
             </div>
           </div>
 
           {vehicleInfo.mileage > 0 && vehicleInfo.fuelPrice > 0 && (
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <p className="text-blue-800 font-medium">Cost Calculation Ready</p>
-              <p className="text-blue-600 text-sm">
+            <div className="p-4 bg-blue-100 rounded-lg">
+              <p className="text-blue-900 font-bold text-lg flex items-center gap-2">Cost Calculation Ready</p>
+              <p className="text-blue-800 text-base mt-2">
                 Fuel cost: ₹{vehicleInfo.fuelPrice}/L • Mileage: {vehicleInfo.mileage} km/L
               </p>
-              <p className="text-blue-600 text-sm">
+              <p className="text-blue-800 text-base">
                 Cost per km: ₹{(vehicleInfo.fuelPrice / vehicleInfo.mileage).toFixed(2)}
               </p>
             </div>

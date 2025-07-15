@@ -15,11 +15,11 @@ export const PriceForecastChart: React.FC<PriceForecastChartProps> = ({
   if (forecasts.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
           <TrendingUp className="mr-2 text-blue-600" size={20} />
           Price Forecast
         </h3>
-        <p className="text-gray-600">No forecast data available for this crop.</p>
+        <p className="text-gray-900">No forecast data available for this crop.</p>
       </div>
     );
   }
@@ -35,68 +35,93 @@ export const PriceForecastChart: React.FC<PriceForecastChartProps> = ({
   const priceChange = ((futurePrice - currentPrice) / currentPrice) * 100;
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 flex items-center">
-          <TrendingUp className="mr-2 text-blue-600" size={20} />
+    <div className="chart-container animate-slide-up">
+      <div className="flex items-center justify-between mb-8">
+        <h3 className="text-xl font-semibold text-gray-900 flex items-center">
+          <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl mr-3 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
+            <TrendingUp className="text-white" size={20} />
+          </div>
           Price Forecast - {variety}
         </h3>
         <div className="text-right">
-          <p className="text-sm text-gray-600">12-Month Trend</p>
-          <p className={`text-lg font-bold ${priceChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(1)}%
-          </p>
+          <p className="text-sm font-medium text-gray-900 mb-1">12-Month Trend</p>
+          <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${
+            priceChange >= 0 
+              ? 'bg-green-100 text-green-800 border border-green-200' 
+              : 'bg-red-100 text-red-800 border border-red-200'
+          }`}>
+            {priceChange >= 0 ? '↗' : '↘'} {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(1)}%
+          </div>
         </div>
       </div>
 
-      <div className="h-80 mb-6">
+      <div className="h-80 mb-8 p-4 bg-gradient-to-br from-blue-50/60 via-indigo-50/40 to-purple-50/30 rounded-xl border border-blue-100/50 shadow-inner">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData}>
             <defs>
               <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
-                <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.4}/>
+                <stop offset="50%" stopColor="#60A5FA" stopOpacity={0.2}/>
+                <stop offset="95%" stopColor="#93C5FD" stopOpacity={0.05}/>
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" strokeOpacity={0.6} />
             <XAxis 
               dataKey="date" 
-              stroke="#6B7280"
-              fontSize={12}
+              stroke="#64748B"
+              fontSize={11}
+              fontWeight={500}
+              tickLine={false}
+              axisLine={false}
             />
             <YAxis 
-              stroke="#6B7280"
-              fontSize={12}
+              stroke="#64748B"
+              fontSize={11}
+              fontWeight={500}
               tickFormatter={(value) => `₹${value}`}
+              tickLine={false}
+              axisLine={false}
             />
             <Tooltip 
               formatter={(value: number) => [`₹${value}/quintal`, 'Predicted Price']}
-              labelStyle={{ color: '#374151' }}
+              labelStyle={{ color: '#374151', fontWeight: 600 }}
               contentStyle={{ 
-                backgroundColor: 'white', 
-                border: '1px solid #E5E7EB',
-                borderRadius: '8px'
+                backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                border: 'none',
+                borderRadius: '12px',
+                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+                backdropFilter: 'blur(8px)'
               }}
             />
             <Area
               type="monotone"
               dataKey="price"
-              stroke="#3B82F6"
+              stroke="#2563EB"
               strokeWidth={3}
               fill="url(#priceGradient)"
+              dot={{ fill: '#2563EB', strokeWidth: 2, r: 4 }}
+              activeDot={{ r: 6, stroke: '#2563EB', strokeWidth: 2, fill: '#ffffff' }}
             />
           </AreaChart>
         </ResponsiveContainer>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <p className="text-blue-800 font-medium">Current Predicted Price</p>
-          <p className="text-2xl font-bold text-blue-900">₹{currentPrice}/quintal</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="stats-card">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-blue-700 font-semibold">Current Predicted Price</p>
+            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+          </div>
+          <p className="text-3xl font-bold text-blue-900 mb-1">₹{currentPrice}</p>
+          <p className="text-sm text-blue-600 font-medium">/quintal</p>
         </div>
-        <div className="bg-green-50 p-4 rounded-lg">
-          <p className="text-green-800 font-medium">12-Month Forecast</p>
-          <p className="text-2xl font-bold text-green-900">₹{futurePrice}/quintal</p>
+        <div className="stats-card">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-green-700 font-semibold">12-Month Forecast</p>
+            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+          </div>
+          <p className="text-3xl font-bold text-green-900 mb-1">₹{futurePrice}</p>
+          <p className="text-sm text-green-600 font-medium">/quintal</p>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { Sprout, BarChart3, MapPin, TrendingUp } from 'lucide-react';
+import { Sprout, BarChart3, MapPin, TrendingUp, Car, Fuel, Calculator, Navigation, Loader2, Wheat, ArrowLeft } from 'lucide-react';
 import { LocationInput } from './components/LocationInput';
 import { CropSelector } from './components/CropSelector';
 import { PriceForecastChart } from './components/PriceForecastChart';
@@ -26,7 +26,12 @@ function App() {
   // User input states
   const [location, setLocation] = useState<LocationData | null>(null);
   const [selectedVariety, setSelectedVariety] = useState('');
-  const [vehicleInfo, setVehicleInfo] = useState<VehicleInfo>({ fuelPrice: 105, mileage: 15 });
+  const [vehicleInfo, setVehicleInfo] = useState<VehicleInfo>({ fuelPrice: 105, mileage: 12 });
+  const [locationMethod, setLocationMethod] = useState<'auto' | 'manual'>('auto');
+  const [selectedState, setSelectedState] = useState('');
+  const [selectedDistrict, setSelectedDistrict] = useState('');
+  const [selectedMarket, setSelectedMarket] = useState('');
+  const [isDetecting, setIsDetecting] = useState(false);
   
   // Analysis states
   const [forecasts, setForecasts] = useState<PriceForecast[]>([]);
@@ -63,48 +68,94 @@ function App() {
 
   const handleLocationChange = (newLocation: LocationData | null) => {
     setLocation(newLocation);
-    // If location is cleared, also clear state-specific markets
     if (!newLocation) {
       setBestStateMarkets([]);
     }
   };
 
-  // Update districts when state changes
   const handleStateChange = (state: string) => {
+    setSelectedState(state);
+    setSelectedDistrict('');
+    setSelectedMarket('');
     const stateDistricts = dataProcessor.getDistricts(state);
     setDistricts(stateDistricts);
-    setMarkets([]); // Clear markets when state changes
+    setMarkets([]);
   };
 
-  const handleDistrictChange = (state: string, district: string) => {
-    if (state && district) {
-      const districtMarkets = dataProcessor.getMarkets(state, district);
+  const handleDistrictChange = (district: string) => {
+    setSelectedDistrict(district);
+    setSelectedMarket('');
+    if (selectedState && district) {
+      const districtMarkets = dataProcessor.getMarkets(selectedState, district);
       setMarkets(districtMarkets);
     }
   };
 
-  // Analyze market data when variety is selected
-  useEffect(() => {
-    if (selectedVariety) {
-      analyzeMarket();
-    }
-  }, [selectedVariety, location]);
+  const detectLocation = async () => {
+    setIsDetecting(true);
+    try {
+      if (!navigator.geolocation) {
+        throw new Error('Geolocation is not supported by this browser');
+      }
 
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+      
+      const locationData: LocationData = {
+        latitude,
+        longitude,
+        address: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`,
+        state: selectedState || 'Unknown',
+        district: selectedDistrict || 'Unknown',
+        market: selectedMarket || ''
+      };
+
+      handleLocationChange(locationData);
+    } catch (error) {
+      console.error('Error detecting location:', error);
+      alert('Unable to detect location. Please select manually.');
+      setLocationMethod('manual');
+    } finally {
+      setIsDetecting(false);
+    }
+  };
+
+  const handleMileageChange = (mileage: number) => {
+    setVehicleInfo({ ...vehicleInfo, mileage });
+  };
+
+  const handleFuelPriceChange = (fuelPrice: number) => {
+    setVehicleInfo({ ...vehicleInfo, fuelPrice });
+  };
+
+  const commonVehicles = [
+    { name: 'Motorcycle', mileage: 45 },
+    { name: 'Small Car', mileage: 18 },
+    { name: 'Pickup Truck', mileage: 12, selected: true },
+    { name: 'Tractor', mileage: 8 },
+    { name: 'Mini Truck', mileage: 10 }
+  ];
+
+  // Analyze market data when variety is selected
   const analyzeMarket = async () => {
     if (!selectedVariety) return;
 
     setIsAnalyzing(true);
     
     try {
-      // Generate price forecasts
       const priceForecast = dataProcessor.generatePriceForecast(selectedVariety, 12);
       setForecasts(priceForecast);
 
-      // Get seasonal patterns
       const patterns = dataProcessor.getSeasonalPatterns(selectedVariety);
       setSeasonalPatterns(patterns);
 
-      // Get best markets
       const bestMarkets = dataProcessor.getBestMarkets(
         selectedVariety, 
         location?.state, 
@@ -112,7 +163,6 @@ function App() {
       );
       setRecommendedMarkets(bestMarkets);
 
-      // Get best markets in the state
       if (location?.state) {
         const stateMarkets = dataProcessor.getBestStateMarkets(selectedVariety, location.state, 3);
         setBestStateMarkets(stateMarkets);
@@ -124,6 +174,22 @@ function App() {
       setIsAnalyzing(false);
     }
   };
+
+  useEffect(() => {
+    if (selectedVariety) {
+      analyzeMarket();
+    }
+  }, [selectedVariety, location]);
+
+  // Scroll to top when selectedVariety changes
+  useEffect(() => {
+    if (selectedVariety) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [selectedVariety]);
+
+
+
 
   if (isLoading) {
     return (
@@ -138,30 +204,32 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+    <div className="min-h-screen bg-gray-200">
+      {/* Professional Header */}
+      <header className="bg-white shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <Sprout className="text-green-600 mr-3" size={32} />
+            <div className="flex items-center space-x-3">
+              <div className="p-3 bg-green-600 rounded-2xl">
+                <Sprout className="text-white" size={24} />
+              </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">APMC Market Advisor</h1>
                 <p className="text-sm text-gray-600">Smart farming decisions with AI-powered insights</p>
               </div>
             </div>
-            <div className="hidden md:flex items-center space-x-6 text-sm text-gray-600">
-              <div className="flex items-center">
-                <MapPin className="mr-1" size={16} />
-                <span>Location-based</span>
+            <div className="hidden lg:flex items-center space-x-6">
+              <div className="flex items-center space-x-2">
+                <MapPin className="text-green-600" size={16} />
+                <span className="text-sm text-gray-700">Location-based</span>
               </div>
-              <div className="flex items-center">
-                <BarChart3 className="mr-1" size={16} />
-                <span>Real-time Data</span>
+              <div className="flex items-center space-x-2">
+                <BarChart3 className="text-green-600" size={16} />
+                <span className="text-sm text-gray-700">Real-time Data</span>
               </div>
-              <div className="flex items-center">
-                <TrendingUp className="mr-1" size={16} />
-                <span>AI Predictions</span>
+              <div className="flex items-center space-x-2">
+                <TrendingUp className="text-green-600" size={16} />
+                <span className="text-sm text-gray-700">AI Predictions</span>
               </div>
             </div>
           </div>
@@ -170,106 +238,315 @@ function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Input Controls */}
-          <div className="lg:col-span-1 space-y-6">
-            <LocationInput
-              onLocationChange={handleLocationChange}
-              states={states}
-              districts={districts}
-              onStateChange={handleStateChange}
-              onDistrictChange={handleDistrictChange}
-              markets={markets}
-            />
-            
-            <CropSelector
-              varieties={varieties}
-              selectedVariety={selectedVariety}
-              onVarietyChange={setSelectedVariety}
-            />
-
-            <VehicleInfoInput
-              vehicleInfo={vehicleInfo}
-              onVehicleInfoChange={setVehicleInfo}
-            />
-
-            {location && (
-              <div className="bg-white rounded-xl shadow-lg p-4">
-                <h3 className="font-semibold text-gray-800 mb-2">Your Location</h3>
-                <p className="text-sm text-gray-600">
-                  {location.district}, {location.state}
+        {!selectedVariety ? (
+          <div className="space-y-8">
+            {/* Welcome Section */}
+            <div className="bg-white rounded-2xl shadow-sm p-8 text-center hover:shadow-md transition-all duration-300 transform hover:scale-[1.01]">
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                Welcome to APMC Market Advisor
+              </h2>
+                <p className="text-gray-900 text-lg font-normal">
+                  Select your location and crop variety to get personalized market insights and AI-powered recommendations.
                 </p>
-                {location.address && (
-                  <p className="text-xs text-gray-500 mt-1">{location.address}</p>
-                )}
               </div>
-            )}
-          </div>
 
-          {/* Right Column - Analysis Results */}
-          <div className="lg:col-span-2 space-y-8">
-            {!selectedVariety ? (
-              <div className="bg-white rounded-xl shadow-lg p-12 text-center">
-                <Sprout className="mx-auto text-gray-400 mb-4" size={64} />
-                <h2 className="text-xl font-semibold text-gray-800 mb-2">
-                  Welcome to APMC Market Advisor
-                </h2>
-                <p className="text-gray-600 mb-6">
-                  Select your location and crop variety to get personalized market insights and recommendations.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div className="p-4 bg-green-50 rounded-lg">
-                    <TrendingUp className="mx-auto text-green-600 mb-2" size={24} />
-                    <p className="font-medium text-green-800">Price Forecasts</p>
-                    <p className="text-green-600">12-month predictions</p>
+            {/* Input Cards Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6 bg-gradient-to-br from-blue-100/60 via-indigo-50/40 to-green-100/50 rounded-3xl shadow-inner border border-blue-100/30">
+              {/* Location and Crop Selection Card */}
+            <div className="bg-white rounded-2xl shadow-sm p-6 hover:shadow-md transition-all duration-300 transform hover:scale-[1.01]">
+                <div className="space-y-6">
+                  {/* Location Section */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <div className="p-2 bg-blue-100 rounded-lg mr-2">
+                        <MapPin className="text-blue-600" size={20} />
+                      </div>
+                      Your Location
+                    </h3>
+                    
+                    <div className="flex gap-2 mb-4">
+                      <button
+                        onClick={() => setLocationMethod('auto')}
+                        className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                          locationMethod === 'auto'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        Auto Detect
+                      </button>
+                      <button
+                        onClick={() => setLocationMethod('manual')}
+                        className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                          locationMethod === 'manual'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        Manual Selection
+                      </button>
+                    </div>
+
+                    {locationMethod === 'auto' ? (
+                      <div className="space-y-4">
+                        <button
+                          onClick={detectLocation}
+                          disabled={isDetecting}
+                          className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                        >
+                          {isDetecting ? (
+                            <>
+                              <Loader2 className="animate-spin mr-2" size={20} />
+                              Detecting Location...
+                            </>
+                          ) : (
+                            <>
+                              <Navigation className="mr-2" size={20} />
+                              Detect My Location
+                            </>
+                          )}
+                        </button>
+                        <p className="text-sm text-gray-600 text-center">
+                          We'll use your GPS location to find nearby markets
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            State
+                          </label>
+                          <select
+                            value={selectedState}
+                            onChange={(e) => handleStateChange(e.target.value)}
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                          >
+                            <option value="">Select State</option>
+                            {states.map(state => (
+                              <option key={state} value={state}>{state}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {selectedState && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              District
+                            </label>
+                            <select
+                              value={selectedDistrict}
+                              onChange={(e) => handleDistrictChange(e.target.value)}
+                              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                            >
+                              <option value="">Select District</option>
+                              {districts.map(district => (
+                                <option key={district} value={district}>{district}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {selectedDistrict && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Market (Optional)
+                            </label>
+                            <select
+                              value={selectedMarket}
+                              onChange={(e) => setSelectedMarket(e.target.value)}
+                              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                            >
+                              <option value="">All Markets in District</option>
+                              {markets.map(market => (
+                                <option key={market} value={market}>{market}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="p-4 bg-blue-50 rounded-lg">
-                    <BarChart3 className="mx-auto text-blue-600 mb-2" size={24} />
-                    <p className="font-medium text-blue-800">Seasonal Analysis</p>
-                    <p className="text-blue-600">Best selling months</p>
-                  </div>
-                  <div className="p-4 bg-purple-50 rounded-lg">
-                    <MapPin className="mx-auto text-purple-600 mb-2" size={24} />
-                    <p className="font-medium text-purple-800">Market Recommendations</p>
-                    <p className="text-purple-600">Nearby best markets</p>
+
+                  {/* Crop Selection Section */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <div className="p-2 bg-yellow-100 rounded-lg mr-2">
+                        <Wheat className="text-yellow-600" size={20} />
+                      </div>
+                      Select Your Crop
+                    </h3>
+                    
+                    <select
+                      value={selectedVariety}
+                      onChange={(e) => setSelectedVariety(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-lg shadow-sm text-gray-900 bg-white text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      aria-label="Select Crop Variety"
+                    >
+                      <option value="">Select Crop Variety</option>
+                      {varieties.map(variety => (
+                        <option key={variety} value={variety}>{variety}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
-            ) : isAnalyzing ? (
-              <div className="bg-white rounded-xl shadow-lg p-12">
-                <LoadingSpinner message="Analyzing market data and generating insights..." />
-              </div>
-            ) : (
-              <>
-                <PriceForecastChart 
-                  forecasts={forecasts} 
-                  variety={selectedVariety} 
-                />
-                
-                <SeasonalAnalysis 
-                  patterns={seasonalPatterns} 
-                  variety={selectedVariety} 
-                />
-                
-                <StateMarketRecommendations
-                  markets={bestStateMarkets}
-                  variety={selectedVariety}
-                  state={location?.state}
-                />
 
-                <MarketRecommendations 
-                  markets={recommendedMarkets} 
-                  bestStateMarkets={bestStateMarkets}
-                  variety={selectedVariety}
-                  userLocation={location ?? undefined} 
-                  vehicleInfo={vehicleInfo}
-                  seasonalPatterns={seasonalPatterns}
-                  costPerKm={costPerKm}
-                />
-              </>
-            )}
+              {/* Vehicle & Fuel Information Card */}
+              <div className="bg-white rounded-2xl shadow-sm p-6 hover:shadow-md transition-all duration-300 transform hover:scale-[1.01]">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <div className="p-2 bg-red-100 rounded-lg mr-2">
+                    <Car className="text-red-600" size={20} />
+                  </div>
+                  Vehicle & Fuel Information
+                </h3>
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <Fuel className="mr-1 text-red-500" size={16} />
+                        Fuel Price (₹/litre)
+                      </label>
+                      <input
+                        type="number"
+                        value={vehicleInfo.fuelPrice}
+                        onChange={(e) => handleFuelPriceChange(parseFloat(e.target.value) || 0)}
+                        placeholder="105"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                        min="0"
+                        step="0.1"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <Calculator className="mr-1 text-gray-500" size={16} />
+                        Vehicle Mileage (km/litre)
+                      </label>
+                      <input
+                        type="number"
+                        value={vehicleInfo.mileage}
+                        onChange={(e) => handleMileageChange(parseFloat(e.target.value) || 0)}
+                        placeholder="15"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                        min="0"
+                        step="0.1"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-3">Quick Select Vehicle Type:</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {commonVehicles.map((vehicle) => (
+                        <button
+                          key={vehicle.name}
+                          onClick={() => handleMileageChange(vehicle.mileage)}
+                          className={`p-4 text-center border rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
+                            vehicleInfo.mileage === vehicle.mileage 
+                              ? 'bg-green-600 text-white border-green-600 shadow-md' 
+                              : 'border-gray-300 hover:bg-gradient-to-br hover:from-gray-50 hover:to-blue-50/30 hover:border-blue-400 bg-white hover:-translate-y-1 text-gray-900'
+                          }`}
+                        >
+                          <div className="font-semibold">{vehicle.name}</div>
+                          <div className="text-sm opacity-80">{vehicle.mileage} km/l</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {vehicleInfo.mileage > 0 && vehicleInfo.fuelPrice > 0 && (
+                    <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-[1.02]">
+                      <p className="text-gray-900 font-bold text-lg flex items-center mb-3">
+                        <span className="text-2xl mr-3">💰</span>
+                        Cost Calculation Ready
+                      </p>
+                      <div className="space-y-2">
+                        <p className="text-gray-800 font-semibold text-base">
+                          Fuel cost: ₹{vehicleInfo.fuelPrice}/L • Mileage: {vehicleInfo.mileage} km/L
+                        </p>
+                        <p className="text-gray-900 font-bold text-lg">
+                          Cost per km: ₹{(vehicleInfo.fuelPrice / vehicleInfo.mileage).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Feature Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white rounded-2xl shadow-sm p-6 text-center hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] hover:-translate-y-1">
+                <div className="w-16 h-16 bg-green-100 rounded-2xl mx-auto mb-4 flex items-center justify-center transition-all duration-300 hover:bg-green-200">
+                  <TrendingUp className="text-green-600" size={32} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Price Forecasts</h3>
+                <p className="text-gray-600">Get accurate price predictions for your crops</p>
+                <p className="text-green-600 font-medium mt-2">AI-powered 12-month predictions</p>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm p-6 text-center hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] hover:-translate-y-1">
+                <div className="w-16 h-16 bg-blue-100 rounded-2xl mx-auto mb-4 flex items-center justify-center transition-all duration-300 hover:bg-blue-200">
+                  <BarChart3 className="text-blue-600" size={32} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Seasonal Analysis</h3>
+                <p className="text-gray-600">Understand market trends and seasonal patterns</p>
+                <p className="text-blue-600 font-medium mt-2">Optimal selling periods</p>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm p-6 text-center hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] hover:-translate-y-1">
+                <div className="w-16 h-16 bg-purple-100 rounded-2xl mx-auto mb-4 flex items-center justify-center transition-all duration-300 hover:bg-purple-200">
+                  <MapPin className="text-purple-600" size={32} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Market Recommendations</h3>
+                <p className="text-gray-600">Find the best markets for your produce</p>
+                <p className="text-purple-600 font-medium mt-2">Location-based insights</p>
+              </div>
+            </div>
           </div>
-        </div>
+        ) : isAnalyzing ? (
+          <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
+            <LoadingSpinner message="Analyzing market data and generating insights..." />
+          </div>
+        ) : (
+          <div className="space-y-8">
+            <div className="bg-white rounded-2xl shadow-sm p-4 mb-6">
+              <button
+                onClick={() => setSelectedVariety('')}
+                className="inline-flex items-center space-x-3 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30"
+              >
+                <ArrowLeft size={20} />
+                <span>Back to Demand Analysis</span>
+              </button>
+            </div>
+            <PriceForecastChart 
+              forecasts={forecasts} 
+              variety={selectedVariety} 
+            />
+            
+            <SeasonalAnalysis 
+              patterns={seasonalPatterns} 
+              variety={selectedVariety} 
+            />
+            
+            <StateMarketRecommendations
+              markets={bestStateMarkets}
+              variety={selectedVariety}
+              state={location?.state}
+            />
+
+            <MarketRecommendations 
+              markets={recommendedMarkets} 
+              bestStateMarkets={bestStateMarkets}
+              variety={selectedVariety}
+              userLocation={location ?? undefined} 
+              vehicleInfo={vehicleInfo}
+              seasonalPatterns={seasonalPatterns}
+              costPerKm={costPerKm}
+            />
+          </div>
+        )}
       </main>
 
       {/* Footer */}

@@ -150,29 +150,31 @@ export const LocationInput: React.FC<LocationInputProps> = ({
   }, [selectedState, selectedDistrict, selectedMarket, manualAddress]);
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-      <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-        <MapPin className="mr-2 text-green-600" size={24} />
+    <div className="professional-card p-6 animate-slide-up">
+      <h2 className="heading-secondary mb-6 flex items-center">
+        <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl mr-3 shadow-lg">
+          <MapPin className="text-white" size={20} />
+        </div>
         Your Location
       </h2>
 
-      <div className="flex gap-4 mb-4">
+      <div className="flex gap-3 mb-6">
         <button
           onClick={() => setLocationMethod('auto')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+          className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all duration-200 ${
             locationMethod === 'auto'
-              ? 'bg-green-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              ? 'btn-primary'
+              : 'btn-outline'
           }`}
         >
           Auto Detect
         </button>
         <button
           onClick={() => setLocationMethod('manual')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+          className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all duration-200 ${
             locationMethod === 'manual'
-              ? 'bg-green-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              ? 'btn-primary'
+              : 'btn-outline'
           }`}
         >
           Manual Selection
@@ -180,11 +182,11 @@ export const LocationInput: React.FC<LocationInputProps> = ({
       </div>
 
       {locationMethod === 'auto' ? (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <button
             onClick={detectLocation}
             disabled={isDetecting}
-            className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            className="w-full btn-secondary flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
           >
             {isDetecting ? (
               <>
@@ -198,20 +200,22 @@ export const LocationInput: React.FC<LocationInputProps> = ({
               </>
             )}
           </button>
-          <p className="text-sm text-gray-600 text-center">
-            We'll use your GPS location to find nearby markets
-          </p>
+          <div className="text-center p-4 bg-blue-50/50 rounded-xl border border-blue-100">
+            <p className="text-sm text-blue-700 font-medium">
+              📍 We'll use your GPS location to find nearby markets
+            </p>
+          </div>
         </div>
       ) : (
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="space-y-5">
+          <div className="animate-fade-in">
+            <label className="block text-sm font-semibold text-gray-700 mb-3">
               State
             </label>
             <select
               value={selectedState}
               onChange={(e) => handleStateChange(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="select-professional"
             >
               <option value="">Select State</option>
               {states.map(state => (
@@ -221,14 +225,14 @@ export const LocationInput: React.FC<LocationInputProps> = ({
           </div>
 
           {selectedState && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="animate-slide-up">
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
                 District
               </label>
               <select
                 value={selectedDistrict}
                 onChange={(e) => handleDistrictChange(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className="select-professional"
               >
                 <option value="">Select District</option>
                 {districts.map(district => (
@@ -239,14 +243,14 @@ export const LocationInput: React.FC<LocationInputProps> = ({
           )}
 
           {selectedDistrict && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="animate-slide-up">
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
                 Market (Optional)
               </label>
               <select
                 value={selectedMarket}
                 onChange={(e) => setSelectedMarket(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className="select-professional"
               >
                 <option value="">All Markets in District</option>
                 {markets.map(market => (
@@ -256,8 +260,8 @@ export const LocationInput: React.FC<LocationInputProps> = ({
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="animate-fade-in">
+            <label className="block text-sm font-semibold text-gray-700 mb-3">
               Address (Optional)
             </label>
             <input
@@ -265,7 +269,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
               value={manualAddress}
               onChange={(e) => setManualAddress(e.target.value)}
               placeholder="Enter your village/town address"
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="input-professional"
             />
           </div>
         </div>
