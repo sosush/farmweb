@@ -452,16 +452,17 @@ const PredictionPanel: React.FC<PredictionPanelProps> = ({
                 </div>
                 <div>
                   <span className="text-xs text-blue-500 font-semibold mb-1">Final Yield (at Harvest)</span>
-                  <span className="text-2xl font-bold text-blue-700">
+                  <br></br>
+                  <span className="text-xl font-bold text-blue-700">
                     {fixedFinalYield !== null ? fixedFinalYield.toFixed(1) : harvestPrediction.finalYield.toFixed(1)}
                   </span>
                   <span className="text-xs text-blue-500 mb-2">t/ha</span>
-                  <div className="mt-3 p-2 bg-green-100 rounded text-sm text-green-800">
-                    <strong>Action Required:</strong> {isOverripe() 
-                      ? 'Harvest immediately to prevent further quality loss!' 
-                      : 'Schedule harvest within the next 3-5 days for optimal quality.'}
-                  </div>
                 </div>
+              </div>
+              <div className="mt-3 p-2 bg-green-100 rounded text-sm text-green-800 w-full block">
+                <strong>Action Required:</strong> {isOverripe() 
+                  ? 'Harvest immediately to prevent further quality loss!' 
+                  : 'Schedule harvest within the next 3-5 days for optimal quality.'}
               </div>
             </div>
           ) : (
@@ -570,7 +571,7 @@ const PredictionPanel: React.FC<PredictionPanelProps> = ({
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-gray-600">Current Stage:</span>
-                <p className="font-medium">
+                <p className="font-bold text-black">
                   {currentStage ? `BBCH ${currentStage.code}` : 'N/A'}
                   {readyForHarvest && (
                     <span className="ml-2 text-green-600 font-bold">(READY)</span>
@@ -579,21 +580,21 @@ const PredictionPanel: React.FC<PredictionPanelProps> = ({
               </div>
               <div>
                 <span className="text-gray-600">Days Since Planting:</span>
-                <p className="font-medium">{currentDay}</p>
+                <p className="font-bold text-black">{currentDay}</p>
               </div>
               <div>
                 <span className="text-gray-600">Humidity:</span>
-                <p className="font-medium">{parameters.humidity} %</p>
+                <p className="font-bold text-black">{parameters.humidity} %</p>
               </div>
               <div>
                 <span className="text-gray-600">Wind Speed:</span>
-                <p className="font-medium">{parameters.windSpeed} m/s</p>
+                <p className="font-bold text-black">{Number(parameters.windSpeed).toFixed(2)} m/s</p>
               </div>
               {pcseData && (
                 <>
                   <div>
                     <span className="text-gray-600">Model Dev. Stage:</span>
-                    <p className="font-medium">
+                    <p className="font-bold text-black">
                       {pcseData.developmentStage.toFixed(2)}
                       {pcseData.developmentStage >= 2.0 && (
                         <span className="ml-1 text-green-600">✓</span>
@@ -602,7 +603,7 @@ const PredictionPanel: React.FC<PredictionPanelProps> = ({
                   </div>
                   <div>
                     <span className="text-gray-600">Overall Health:</span>
-                    <p className="font-medium">
+                    <p className="font-bold text-black">
                       {(((pcseData.stressIndicators.waterStress + pcseData.stressIndicators.nitrogenStress + pcseData.stressIndicators.temperatureStress) / 3) * 100).toFixed(0)}%
                     </p>
                   </div>

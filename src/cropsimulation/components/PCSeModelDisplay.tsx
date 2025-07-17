@@ -53,7 +53,7 @@ const PCSeModelDisplay: React.FC<PCSeModelDisplayProps> = ({ pcseData, currentSt
               <span className="text-sm text-gray-700">Water</span>
             </div>
             <div className="flex items-center space-x-2">
-              <span className="text-sm font-medium">{formatNumber(pcseData.stressIndicators.waterStress * 100, 0)}%</span>
+              <span className="text-sm font-bold text-black">{formatNumber(pcseData.stressIndicators.waterStress * 100, 0)}%</span>
               <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStressColor(pcseData.stressIndicators.waterStress)}`}>
                 {getStressLabel(pcseData.stressIndicators.waterStress)}
               </span>
@@ -66,7 +66,7 @@ const PCSeModelDisplay: React.FC<PCSeModelDisplayProps> = ({ pcseData, currentSt
               <span className="text-sm text-gray-700">Nitrogen</span>
             </div>
             <div className="flex items-center space-x-2">
-              <span className="text-sm font-medium">{formatNumber(pcseData.stressIndicators.nitrogenStress * 100, 0)}%</span>
+              <span className="text-sm font-bold text-black">{formatNumber(pcseData.stressIndicators.nitrogenStress * 100, 0)}%</span>
               <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStressColor(pcseData.stressIndicators.nitrogenStress)}`}>
                 {getStressLabel(pcseData.stressIndicators.nitrogenStress)}
               </span>
@@ -79,7 +79,7 @@ const PCSeModelDisplay: React.FC<PCSeModelDisplayProps> = ({ pcseData, currentSt
               <span className="text-sm text-gray-700">Temperature</span>
             </div>
             <div className="flex items-center space-x-2">
-              <span className="text-sm font-medium">{formatNumber(pcseData.stressIndicators.temperatureStress * 100, 0)}%</span>
+              <span className="text-sm font-bold text-black">{formatNumber(pcseData.stressIndicators.temperatureStress * 100, 0)}%</span>
               <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStressColor(pcseData.stressIndicators.temperatureStress)}`}>
                 {getStressLabel(pcseData.stressIndicators.temperatureStress)}
               </span>
@@ -101,7 +101,7 @@ const PCSeModelDisplay: React.FC<PCSeModelDisplayProps> = ({ pcseData, currentSt
             <div className="text-lg font-bold text-purple-800">
               {formatNumber(pcseData.developmentStage, 2)}
               {pcseData.developmentStage >= 2.0 && (
-                <span className="ml-2 text-green-600 text-sm font-bold">(MATURE)</span>
+                <span className="ml-2 text-green-600 text-sm font-bold"><br></br>(MATURE)</span>
               )}
             </div>
           </div>
