@@ -1,7 +1,7 @@
 // src/components/cows/AddEditCowModal.tsx
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import type { Cow } from '../../types';
+import type { Cow } from '../../types'; // Assuming this path is correct relative to the component
 
 interface Props {
   cow?: Partial<Cow>;
@@ -17,7 +17,8 @@ const AddEditCowModal = ({ cow, onClose, onSave }: Props) => {
     color: cow?.color || '',
     markings: cow?.markings || '',
     age_category: cow?.age_category || 'Calf',
-    status: 'Active' as Cow['status']
+    // Initialize status from cow prop, default to 'Active' if not provided
+    status: cow?.status || 'Active' as Cow['status']
   });
 
   const [loading, setLoading] = useState(false);
@@ -29,12 +30,16 @@ const AddEditCowModal = ({ cow, onClose, onSave }: Props) => {
       setLoading(true);
       setError('');
 
+      // When saving, include all form fields directly.
+      // Remove hardcoded 'name' and 'status' if they are now part of the form.
+      // Ensure created_at and updated_at are handled, typically by the backend on create/update.
+      // For editing, you might want to preserve the original created_at.
+      // For new records, created_at should be set. updated_at should always be new.
       await onSave({
         ...form,
-        name: '',
-        status: 'Active',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        name: cow?.name || '', // Preserve existing name if editing, or default for new
+        created_at: cow?.created_at || new Date().toISOString(), // Preserve if editing, or set new
+        updated_at: new Date().toISOString() // Always set a new updated_at
       });
       onClose();
     } catch (error: any) {
@@ -140,6 +145,24 @@ const AddEditCowModal = ({ cow, onClose, onSave }: Props) => {
               rows={3}
               placeholder="Describe any distinctive markings or features"
             />
+          </div>
+
+          {/* New Status Field */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-black">
+              Status*
+            </label>
+            <select
+              value={form.status}
+              onChange={e => setForm(f => ({ ...f, status: e.target.value as Cow['status'] }))}
+              className="mt-1 block w-full rounded-md border-gray-300"
+              required
+            >
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+              <option value="Deceased">Deceased</option>
+              <option value="Sold">Sold</option>
+            </select>
           </div>
 
           <div className="mt-5 flex justify-end space-x-3">

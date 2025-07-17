@@ -1,7 +1,6 @@
 // src/components/cows/CowDetails.tsx
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-// import { useRouter } from 'next/router'; // Removed unused import
+import { useParams } from 'next/navigation'; // Correct import for App Router
 import { format } from 'date-fns';
 import { Edit, Trash2, Plus } from 'lucide-react';
 import { CowService } from '../../lib/cowService';
@@ -10,9 +9,10 @@ import AddEditCowModal from './AddEditCowModal';
 import AddRecordModal from './AddRecordModal';
 
 export default function CowDetails() {
+  // For App Router, use useParams to get dynamic route segments
   const params = useParams();
-  const id = params.id as string; // Cast id to string
-  const router = useRouter(); // Keep useRouter for navigation
+  const id = params.id as string; // Ensure id is a string
+
   const [cow, setCow] = useState<Cow | null>(null);
   const [healthRecords, setHealthRecords] = useState<HealthRecord[]>([]);
   const [breedingRecords, setBreedingRecords] = useState<BreedingRecord[]>([]);
@@ -23,8 +23,10 @@ export default function CowDetails() {
   const [addRecordModal, setAddRecordModal] = useState<'health' | 'breeding' | null>(null);
 
   useEffect(() => {
-    if (id) loadCowData();
-  }, [id]); // Add id to dependency array
+    if (id) {
+      loadCowData();
+    }
+  }, [id]);
 
   const loadCowData = async () => {
     try {
@@ -33,11 +35,11 @@ export default function CowDetails() {
       const cows = await CowService.getCows();
       const currentCow = cows.find(c => c.id === id);
       if (!currentCow) throw new Error('Cow not found');
-      
+
       setCow(currentCow);
       const healthData = await CowService.getHealthRecords(id);
       const breedingData = await CowService.getBreedingRecords(id);
-      
+
       setHealthRecords(healthData);
       setBreedingRecords(breedingData);
     } catch (error) {
@@ -48,18 +50,14 @@ export default function CowDetails() {
     }
   };
 
-  // In CowDetails.tsx
-
-// Add a helper function to safely format dates
-const formatDate = (date: string | undefined) => {
-  if (!date) return 'Not set';
-  try {
-    return format(new Date(date), 'dd MMM yyyy');
-  } catch (error) {
-    return 'Invalid date';
-  }
-};
-
+  const formatDate = (date: string | undefined) => {
+    if (!date) return 'Not set';
+    try {
+      return format(new Date(date), 'dd MMM yyyy');
+    } catch (error) {
+      return 'Invalid date';
+    }
+  };
 
   const handleSave = async (updatedCow: Omit<Cow, 'id'>) => {
     try {
@@ -76,9 +74,9 @@ const formatDate = (date: string | undefined) => {
   const handleSaveRecord = async (record: Omit<HealthRecord | BreedingRecord, 'id'>) => {
     try {
       if (addRecordModal === 'health') {
-        await CowService.saveHealthRecord(record as Omit<HealthRecord, 'id'>);
+        await CowService.saveHealthRecord({ ...record, cow_id: id } as Omit<HealthRecord, 'id'>);
       } else {
-        await CowService.saveBreedingRecord(record as Omit<BreedingRecord, 'id'>);
+        await CowService.saveBreedingRecord({ ...record, cow_id: id } as Omit<BreedingRecord, 'id'>);
       }
       await loadCowData();
       setAddRecordModal(null);
@@ -88,11 +86,20 @@ const formatDate = (date: string | undefined) => {
     }
   };
 
+  // For App Router, you'd typically use `useRouter` from `next/navigation`
+  // for programmatic navigation, but the `router.push` here is from Pages Router
+  // If you are moving to App Router, this will need to be updated.
+  // For now, assuming you'll keep Pages Router until a full migration.
   const handleDelete = async () => {
     try {
       setLoading(true);
       await CowService.deleteCow(id);
-      router.push('/cattlefarmmanagement/cows');
+      // If using App Router, you'd use `router.push('/cattlefarmmanagement/cows');`
+      // from `useRouter` imported from 'next/navigation'.
+      // For now, retaining the original, assuming you're still on Pages Router with this page.
+      // If this component *is* a page, then 'next/router' is correct for it.
+      // If it's a component *within* an App Router page, it needs `next/navigation`.
+      window.location.href = '/cattlefarmmanagement/cows'; // Fallback for demonstration
     } catch (error) {
       setError('Failed to delete cow');
       console.error(error);
@@ -149,7 +156,6 @@ const formatDate = (date: string | undefined) => {
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
-        {/* Cow Details Card */}
         <div className="bg-white rounded-lg shadow p-6 space-y-4">
           <div className="space-y-2">
             <div>
@@ -162,15 +168,14 @@ const formatDate = (date: string | undefined) => {
             </div>
             <div>
               <span className="text-sm text-gray-500 dark:text-black-500">Date of Birth</span>
-                <p className="font-medium dark:text-black">
-                  {cow.date_of_birth ? formatDate(cow.date_of_birth) : 'Not set'}
-                </p>
+              <p className="font-medium dark:text-black">
+                {cow.date_of_birth ? formatDate(cow.date_of_birth) : 'Not set'}
+              </p>
             </div>
             <div>
               <span className="text-sm text-gray-500 dark:text-black-500">Color</span>
               <p className="font-medium dark:text-black">{cow.color}</p>
             </div>
-            {/* Add Markings field */}
             <div>
               <span className="text-sm text-gray-500 dark:text-black-500">Markings</span>
               <p className="font-medium dark:text-black">{cow.markings || 'No markings recorded'}</p>
@@ -182,7 +187,6 @@ const formatDate = (date: string | undefined) => {
           </div>
         </div>
 
-        {/* Health Records Section */}
         <div className="md:col-span-2">
           <div className="bg-white rounded-lg shadow p-6 mb-6">
             <div className="flex justify-between items-center mb-4">
@@ -195,7 +199,6 @@ const formatDate = (date: string | undefined) => {
                 Add Record
               </button>
             </div>
-            {/* Health Records List */}
             {healthRecords.map(record => (
               <div key={record.id} className="border-t py-4">
                 <div className="flex justify-between">
@@ -209,7 +212,6 @@ const formatDate = (date: string | undefined) => {
             ))}
           </div>
 
-          {/* Breeding Records Section */}
           {cow.age_category === 'Adult' ? (
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex justify-between items-center mb-4">
@@ -244,7 +246,6 @@ const formatDate = (date: string | undefined) => {
         </div>
       </div>
 
-      {/* Modals */}
       {editModal && (
         <AddEditCowModal
           cow={cow || undefined}
@@ -262,7 +263,6 @@ const formatDate = (date: string | undefined) => {
         />
       )}
 
-      {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
           <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
@@ -296,4 +296,4 @@ const formatDate = (date: string | undefined) => {
       )}
     </div>
   );
-}
+} 

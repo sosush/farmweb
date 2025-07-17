@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
 import { format, subDays, subMonths } from 'date-fns';
-import { Plus, TrendingUp, TrendingDown, Equal, FileSpreadsheet, FileText } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, Equal, FileSpreadsheet, FileText, PawPrint, BellRing } from 'lucide-react'; // Added BellRing for alerts
 import { formatDistanceToNow } from 'date-fns/formatDistanceToNow';
-import Link from 'next/link'; // Import Link from next/link
+import Link from 'next/link';
+// Assuming these paths are correct relative to where Dashboard.tsx is located
 import { DataService } from '../lib/dataService';
-// Add CowService import
 import { CowService } from '../lib/cowService';
 import type { MilkRecord, Cow, HealthRecord } from '../types';
-import SkeletonLoader from './ui/SkeletonLoader';
-import CattleNavbar from "./Navbar";
 
 const Dashboard = () => {
   const [todayStats, setTodayStats] = useState<MilkRecord | null>(null);
@@ -22,7 +20,6 @@ const Dashboard = () => {
     month: string;
     records: MilkRecord[];
   } | null>(null);
-  // Add new state for cow statistics
   const [cowStats, setCowStats] = useState({
     total: 0,
     adults: 0,
@@ -37,41 +34,41 @@ const Dashboard = () => {
         const currentMonth = format(currentDate, 'yyyy-MM');
         const dayOfMonth = parseInt(format(currentDate, 'dd'));
 
-        // Prepare promises for parallel fetching
-        const recordsPromise = DataService.getMonthlyRecords(currentMonth);
-        const cowsPromise = CowService.getCows({ status: 'Active' });
-        let previousMonthPromise: Promise<MilkRecord[]> | null = null;
+        // Check if we're in first 5 days of the month
         if (dayOfMonth <= 5) {
           const previousMonth = format(subMonths(currentDate, 1), 'yyyy-MM');
-          previousMonthPromise = DataService.getMonthlyRecords(previousMonth);
+          const previousRecords = await DataService.getMonthlyRecords(previousMonth);
+
+          if (previousRecords.length > 0) {
+            setPreviousMonthData({
+              month: previousMonth,
+              records: previousRecords
+            });
+
+            // Archive previous month's data - this usually happens once per month
+            // Consider moving this to a server-side function or a dedicated job
+            // for more robust execution.
+            await DataService.checkAndArchiveOldMonth();
+          }
         }
 
-        // Await all in parallel
-        const [records, cows, previousRecords] = await Promise.all([
-          recordsPromise,
-          cowsPromise,
-          previousMonthPromise ?? Promise.resolve([])
-        ]);
+        // Fetch current month records
+        const records = await DataService.getMonthlyRecords(currentMonth);
 
-        // Archive previous month's data if needed
-        if (previousMonthPromise && previousRecords.length > 0) {
-          setPreviousMonthData({
-            month: format(subMonths(currentDate, 1), 'yyyy-MM'),
-            records: previousRecords
-          });
-          await DataService.checkAndArchiveOldMonth();
-        }
-
-        // Sort records by date
-        const sortedRecords = records.sort((a, b) => 
+        // Sort records by date (most recent first)
+        const sortedRecords = records.sort((a, b) =>
           new Date(b.date).getTime() - new Date(a.date).getTime()
         );
+
         setMonthlyRecords(sortedRecords);
 
         const todayDate = format(new Date(), 'yyyy-MM-dd');
         const yesterdayDate = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+
+        // Find today's and yesterday's records
         const todayRecord = sortedRecords.find(record => record.date === todayDate);
         const yesterdayRecord = sortedRecords.find(record => record.date === yesterdayDate);
+
         setTodayStats(todayRecord || null);
         setYesterdayStats(yesterdayRecord || null);
 
@@ -80,6 +77,7 @@ const Dashboard = () => {
           const total = sortedRecords.reduce((sum, record) => sum + record.total_milk, 0);
           setMonthlyTotal(total);
           setMonthlyRecordCount(sortedRecords.length);
+
           // Get last 7 days data
           const last7Days = sortedRecords
             .slice(0, 7)
@@ -87,7 +85,8 @@ const Dashboard = () => {
               date: format(new Date(record.date), 'MMM dd'),
               total: record.total_milk
             }))
-            .reverse();
+            .reverse(); // Reverse to show chronologically (oldest first)
+
           setWeeklyData(last7Days);
         } else {
           setMonthlyTotal(0);
@@ -95,12 +94,14 @@ const Dashboard = () => {
           setWeeklyData([]);
         }
 
-        // Cow stats
+        // Add cow statistics fetch
+        const cows = await CowService.getCows({ status: 'Active' });
         const stats = calculateCowStats(cows);
         setCowStats(stats);
 
       } catch (error) {
         console.error('Error fetching data:', error);
+        // Reset states on error
         setMonthlyRecords([]);
         setMonthlyTotal(0);
         setMonthlyRecordCount(0);
@@ -113,7 +114,6 @@ const Dashboard = () => {
     fetchData();
   }, []); // Run once on component mount
 
-  // Add helper function to calculate stats
   const calculateCowStats = (cows: Cow[]) => {
     const adults = cows.filter(cow => cow.age_category === 'Adult').length;
     const calves = cows.filter(cow => cow.age_category === 'Calf').length;
@@ -126,11 +126,11 @@ const Dashboard = () => {
 
   const getProductionTrend = () => {
     if (!todayStats || !yesterdayStats) return null;
-    
+
     const diff = todayStats.total_milk - yesterdayStats.total_milk;
-    if (diff > 0) return { icon: TrendingUp, color: 'text-green-500', text: `+${diff.toFixed(1)}L` };
-    if (diff < 0) return { icon: TrendingDown, color: 'text-red-500', text: `${diff.toFixed(1)}L` };
-    return { icon: Equal, color: 'text-yellow-500', text: 'No change' };
+    if (diff > 0) return { icon: TrendingUp, color: 'text-green-600', text: `+${diff.toFixed(1)}L` }; // Stronger green
+    if (diff < 0) return { icon: TrendingDown, color: 'text-red-600', text: `${diff.toFixed(1)}L` }; // Stronger red
+    return { icon: Equal, color: 'text-gray-500', text: 'No change' }; // Gray for neutral
   };
 
   const trend = getProductionTrend();
@@ -146,7 +146,7 @@ const Dashboard = () => {
           'Total (L)': record.total_milk
         }))
       );
-      
+
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Milk Records');
       XLSX.writeFile(workbook, `milk-records-${month}.xlsx`);
@@ -159,9 +159,9 @@ const Dashboard = () => {
     try {
       const { jsPDF } = await import('jspdf');
       const { default: autoTable } = await import('jspdf-autotable');
-      
+
       const doc = new jsPDF();
-      
+
       autoTable(doc, {
         head: [['Date', 'Morning (L)', 'Evening (L)', 'Total (L)']],
         body: records.map(record => [
@@ -172,7 +172,7 @@ const Dashboard = () => {
         ]),
         startY: 20,
         styles: { fontSize: 8 },
-        headStyles: { fillColor: [41, 128, 185] }
+        headStyles: { fillColor: [76, 175, 80] } // Green-500 equivalent for PDF header
       });
 
       doc.save(`milk-records-${month}.pdf`);
@@ -183,184 +183,195 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <SkeletonLoader height="h-8" width="w-1/3" className="mb-4" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <SkeletonLoader height="h-32" count={3} />
-        </div>
-        <SkeletonLoader height="h-12" width="w-full" className="my-4" />
-        <SkeletonLoader height="h-64" width="w-full" />
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div> {/* Green spinner */}
       </div>
     );
   }
 
   return (
-    <>
-      <CattleNavbar />
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold dark:text-white">Dashboard</h1>
+    <div className="space-y-8 p-6 bg-gray-50 min-h-screen"> {/* Lighter background */}
+      <h1 className="text-3xl font-extrabold text-gray-800">Farm Overview</h1> {/* Stronger title */}
 
-        {/* Alerts Section */}
-        <div className="grid grid-cols-1 gap-6 mb-6">
-          <AlertsSection />
-        </div>
-
-        {/* Add Herd Statistics section before existing grid */}
-        <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg transition-colors duration-200">
-            <h2 className="text-lg font-semibold mb-4 dark:text-white">Herd Statistics</h2>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {cowStats.total}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Animals</p>
-              </div>
-              <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {cowStats.adults}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Adult Cows</p>
-              </div>
-              <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                  {cowStats.calves}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Calves</p>
-              </div>
-            </div>
-          </div>
-          
-          {/* Your existing Today's Stats Card */}
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg transition-colors duration-200">
-            <h2 className="text-lg font-semibold mb-4 dark:text-white">Today's Production</h2>
-            {todayStats ? (
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 dark:text-gray-400">Total</span>
-                  <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                    {todayStats.total_milk}L
-                  </span>
-                </div>
-                {trend && (
-                  <div className="flex items-center text-sm">
-                    <trend.icon className={`h-4 w-4 mr-1 ${trend.color}`} />
-                    <span className={trend.color}>{trend.text} from yesterday</span>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-4 mt-4">
-                  <div className="text-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Morning</div>
-                    <div className="font-semibold dark:text-white">{todayStats.morning_milk}L</div>
-                  </div>
-                  <div className="text-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Evening</div>
-                    <div className="font-semibold dark:text-white">{todayStats.evening_milk}L</div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center">
-                <p className="text-gray-600 dark:text-gray-400 mb-4">No data recorded for today</p>
-                <Link
-                  href="/cattlefarmmanagement/data-entry"
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Today's Record
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Monthly Overview Card */}
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg transition-colors duration-200">
-            <h2 className="text-lg font-semibold mb-4 dark:text-white">Monthly Overview</h2>
-            <div className="space-y-4">
-              <div className="text-center">
-                <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                  {monthlyTotal.toFixed(1)}L
-                </span>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Production</p>
-              </div>
-              <div className="text-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                <div className="text-sm text-gray-600 dark:text-gray-400">Daily Average</div>
-                <div className="font-semibold dark:text-white">
-                  {monthlyRecordCount > 0 ? (monthlyTotal / monthlyRecordCount).toFixed(1) : '0.0'}L
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Avg Morning</div>
-                  <div className="font-semibold dark:text-white">
-                    {monthlyRecordCount > 0 
-                      ? (monthlyRecords.reduce((sum, r) => sum + r.morning_milk, 0) / monthlyRecordCount).toFixed(1) 
-                      : '0.0'}L
-                  </div>
-                </div>
-                <div className="text-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Avg Evening</div>
-                  <div className="font-semibold dark:text-white">
-                    {monthlyRecordCount > 0 
-                      ? (monthlyRecords.reduce((sum, r) => sum + r.evening_milk, 0) / monthlyRecordCount).toFixed(1) 
-                      : '0.0'}L
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg transition-colors duration-200">
-            <h2 className="text-lg font-semibold mb-4 dark:text-white">Weekly Trend</h2>
-            <div className="space-y-2">
-              {weeklyData.map((day) => (
-                <div key={day.date} className="flex justify-between items-center py-2 border-b dark:border-gray-700 last:border-0">
-                  <span className="text-gray-600 dark:text-gray-400">{day.date}</span>
-                  <span className="font-semibold dark:text-white">{day.total}L</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Previous Month Export Section */}
-        {previousMonthData && (
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg transition-colors duration-200">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold dark:text-white">
-                Previous Month Records - {format(new Date(previousMonthData.month), 'MMMM yyyy')}
-              </h2>
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => handleExportExcel(previousMonthData.month, previousMonthData.records)}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600"
-                >
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
-                  Export Excel
-                </button>
-                <button
-                  onClick={() => handleExportPDF(previousMonthData.month, previousMonthData.records)}
-                  className="inline-flex items-center px-3 py-2 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Export PDF
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+      {/* Alerts Section - now with BellRing icon and green theme */}
+      <div className="grid grid-cols-1 gap-6">
+        <AlertsSection />
       </div>
-    </>
+
+      {/* Main Stats Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* Herd Statistics Card */}
+        <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col justify-between border border-gray-100">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-800 flex items-center">
+              <PawPrint className="h-6 w-6 mr-2 text-green-600" />
+              Our Herd
+            </h2>
+            <Link
+              href="/cattlefarmmanagement/cows"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 transition-colors shadow-md"
+            >
+              <PawPrint className="h-4 w-4 mr-2" />
+              Manage Animals
+            </Link>
+          </div>
+          <div className="grid grid-cols-3 gap-4 mt-4">
+            <div className="text-center p-4 bg-green-50 rounded-lg border border-green-100">
+              <p className="text-3xl font-bold text-green-700">
+                {cowStats.total}
+              </p>
+              <p className="text-sm text-gray-600">Total Animals</p>
+            </div>
+            <div className="text-center p-4 bg-green-50 rounded-lg border border-green-100">
+              <p className="text-3xl font-bold text-green-700">
+                {cowStats.adults}
+              </p>
+              <p className="text-sm text-gray-600">Adults</p>
+            </div>
+            <div className="text-center p-4 bg-green-50 rounded-lg border border-green-100">
+              <p className="text-3xl font-bold text-green-700">
+                {cowStats.calves}
+              </p>
+              <p className="text-sm text-gray-600">Calves</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Today's Production Card */}
+        <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col justify-between border border-gray-100">
+          <h2 className="text-xl font-semibold mb-4 text-gray-800">Today's Milk Production</h2>
+          {todayStats ? (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center bg-green-100 p-3 rounded-lg shadow-sm">
+                <span className="text-lg text-gray-700 font-medium">Total Yield</span>
+                <span className="text-4xl font-extrabold text-green-700">
+                  {todayStats.total_milk.toFixed(1)} L
+                </span>
+              </div>
+              {trend && (
+                <div className="flex items-center text-md justify-center mt-3 p-2 bg-gray-50 rounded-md">
+                  <trend.icon className={`h-5 w-5 mr-2 ${trend.color}`} />
+                  <span className={`${trend.color} font-semibold`}>{trend.text}</span>
+                  <span className="text-gray-600 ml-1"> from yesterday</span>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="text-center p-3 bg-gray-50 rounded-md border border-gray-100">
+                  <div className="text-sm text-gray-600">Morning</div>
+                  <div className="font-bold text-lg text-gray-800">{todayStats.morning_milk.toFixed(1)} L</div>
+                </div>
+                <div className="text-center p-3 bg-gray-50 rounded-md border border-gray-100">
+                  <div className="text-sm text-gray-600">Evening</div>
+                  <div className="font-bold text-lg text-gray-800">{todayStats.evening_milk.toFixed(1)} L</div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center p-6 bg-gray-50 rounded-lg">
+              <p className="text-gray-600 mb-5 text-lg">No milk record for today.</p>
+              <Link
+                href="/cattlefarmmanagement/data-entry"
+                className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 transition-colors shadow-md"
+              >
+                <Plus className="h-5 w-5 mr-3" />
+                Add Today's Record
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* Monthly Overview Card */}
+        <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col justify-between border border-gray-100">
+          <h2 className="text-xl font-semibold mb-4 text-gray-800">Monthly Performance</h2>
+          <div className="space-y-4">
+            <div className="text-center">
+              <span className="text-4xl font-extrabold text-green-700">
+                {monthlyTotal.toFixed(1)} L
+              </span>
+              <p className="text-lg text-gray-600">Total Production (This Month)</p>
+            </div>
+            <div className="p-3 bg-green-50 rounded-lg border border-green-100 text-center">
+              <div className="text-sm text-gray-700">Daily Average</div>
+              <div className="font-bold text-xl text-green-700">
+                {monthlyRecordCount > 0 ? (monthlyTotal / monthlyRecordCount).toFixed(1) : '0.0'} L
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center p-3 bg-gray-50 rounded-md border border-gray-100">
+                <div className="text-sm text-gray-600">Avg Morning</div>
+                <div className="font-bold text-lg text-gray-800">
+                  {monthlyRecordCount > 0
+                    ? (monthlyRecords.reduce((sum, r) => sum + r.morning_milk, 0) / monthlyRecordCount).toFixed(1)
+                    : '0.0'} L
+                </div>
+              </div>
+              <div className="text-center p-3 bg-gray-50 rounded-md border border-gray-100">
+                <div className="text-sm text-gray-600">Avg Evening</div>
+                <div className="font-bold text-lg text-gray-800">
+                  {monthlyRecordCount > 0
+                    ? (monthlyRecords.reduce((sum, r) => sum + r.evening_milk, 0) / monthlyRecordCount).toFixed(1)
+                    : '0.0'} L
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Weekly Trend Card (moved to separate section for better layout control) */}
+      <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+        <h2 className="text-xl font-semibold mb-6 text-gray-800">Weekly Production Trend</h2>
+        <div className="space-y-3">
+          {weeklyData.length > 0 ? (
+            weeklyData.map((day) => (
+              <div key={day.date} className="flex justify-between items-center py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 rounded-md px-2 transition-colors duration-150">
+                <span className="text-gray-700 font-medium">{day.date}</span>
+                <span className="font-bold text-lg text-green-700">{day.total.toFixed(1)} L</span>
+              </div>
+            ))
+          ) : (
+            <p className="text-gray-600 text-center py-4">No weekly data available.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Previous Month Export Section */}
+      {previousMonthData && (
+        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-800 mb-3 md:mb-0">
+              Export Records for {format(new Date(previousMonthData.month), 'MMMM yyyy')}
+            </h2>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => handleExportExcel(previousMonthData.month, previousMonthData.records)}
+                className="inline-flex items-center px-5 py-2.5 border border-green-300 shadow-sm text-sm font-medium rounded-lg text-green-800 bg-green-50 hover:bg-green-100 transition-colors"
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export as Excel
+              </button>
+              <button
+                onClick={() => handleExportPDF(previousMonthData.month, previousMonthData.records)}
+                className="inline-flex items-center px-5 py-2.5 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 transition-colors"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Export as PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
 const AlertsSection = () => {
   const [alerts, setAlerts] = useState<{
-    calvingAlerts: Array<{cow: Cow, date: string}>;
-    followupAlerts: Array<{cow: Cow, record: HealthRecord, date: string}>;
+    calvingAlerts: Array<{ cow: Cow, date: string }>;
+    followupAlerts: Array<{ cow: Cow, record: HealthRecord, date: string }>;
   }>({ calvingAlerts: [], followupAlerts: [] });
+  const [loadingAlerts, setLoadingAlerts] = useState(true); // New loading state for alerts
 
   useEffect(() => {
     loadAlerts();
@@ -368,49 +379,65 @@ const AlertsSection = () => {
 
   const loadAlerts = async () => {
     try {
+      setLoadingAlerts(true);
       const alertData = await CowService.getUpcomingAlerts();
       setAlerts(alertData);
     } catch (error) {
       console.error('Error loading alerts:', error);
+    } finally {
+      setLoadingAlerts(false);
     }
   };
 
+  if (loadingAlerts) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
+
   if (alerts.calvingAlerts.length === 0 && alerts.followupAlerts.length === 0) {
-    return null;
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6 text-center text-gray-600 border border-gray-100">
+        <p className="font-medium">No upcoming alerts at this time. All clear!</p>
+      </div>
+    );
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-      <h2 className="text-lg font-semibold mb-4 dark:text-white">
-        Upcoming Alerts
+    <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+      <h2 className="text-xl font-semibold mb-5 text-gray-800 flex items-center">
+        <BellRing className="h-6 w-6 mr-2 text-red-500" /> {/* Bell icon for alerts */}
+        Important Alerts
       </h2>
-      <div className="space-y-4">
+      <div className="space-y-5">
         {alerts.calvingAlerts.length > 0 && (
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            <h3 className="text-lg font-medium text-gray-700 border-b pb-2 mb-3 border-gray-100">
               Upcoming Calvings
             </h3>
             {alerts.calvingAlerts.map(({ cow, date }) => (
-              <div 
+              <div
                 key={cow.id}
-                className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg"
+                className="flex items-center justify-between p-4 bg-red-50 rounded-lg shadow-sm border border-red-100"
               >
                 <div>
                   <Link
                     href={`/cattlefarmmanagement/cows/${cow.id}`}
-                    className="text-blue-700 dark:text-blue-400 font-medium hover:underline"
+                    className="text-red-700 font-bold hover:underline text-lg"
                   >
-                    {cow.tag_number}
+                    Tag: {cow.tag_number}
                   </Link>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-gray-600 mt-1">
                     Expected calving date
                   </p>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-medium">
+                  <div className="text-md font-semibold text-gray-800">
                     {format(new Date(date), 'dd MMM yyyy')}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                  <div className="text-xs text-gray-500 mt-0.5">
                     {formatDistanceToNow(new Date(date), { addSuffix: true })}
                   </div>
                 </div>
@@ -421,30 +448,30 @@ const AlertsSection = () => {
 
         {alerts.followupAlerts.length > 0 && (
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            <h3 className="text-lg font-medium text-gray-700 border-b pb-2 mb-3 border-gray-100">
               Health Follow-ups
             </h3>
             {alerts.followupAlerts.map(({ cow, record, date }) => (
-              <div 
+              <div
                 key={record.id}
-                className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg"
+                className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg shadow-sm border border-yellow-100"
               >
                 <div>
                   <Link
                     href={`/cattlefarmmanagement/cows/${cow.id}`}
-                    className="text-green-700 dark:text-green-400 font-medium hover:underline"
+                    className="text-yellow-700 font-bold hover:underline text-lg"
                   >
-                    {cow.tag_number}
+                    Tag: {cow.tag_number}
                   </Link>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {record.record_type} follow-up
+                  <p className="text-sm text-gray-600 mt-1">
+                    <span className="font-semibold">{record.record_type}</span> follow-up needed
                   </p>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-medium">
+                  <div className="text-md font-semibold text-gray-800">
                     {format(new Date(date), 'dd MMM yyyy')}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                  <div className="text-xs text-gray-500 mt-0.5">
                     {formatDistanceToNow(new Date(date), { addSuffix: true })}
                   </div>
                 </div>

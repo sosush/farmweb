@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
-import { FileSpreadsheet, FileText, Calendar, ChevronDown, ChevronRight } from 'lucide-react';
-import { DataService } from '../lib/dataService';
-import type { MilkRecord, MonthlyTotal } from '../types';
-import { Button } from './ui/Button';
-import SkeletonLoader from './ui/SkeletonLoader';
-import CattleNavbar from "./Navbar";
+import { format, parseISO } from 'date-fns'; // Import parseISO for date parsing
+import { FileSpreadsheet, FileText, Calendar, ChevronDown, ChevronRight, BarChart } from 'lucide-react'; // Added BarChart icon
+import { DataService } from '../lib/dataService'; // Assuming this path is correct
+import type { MilkRecord, MonthlyTotal } from '../types'; // Assuming this path is correct
+import { Button } from './ui/Button'; // Assuming this Button component exists and is styled
 
 const Reports = () => {
   const [activeMonth, setActiveMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -16,245 +14,284 @@ const Reports = () => {
 
   useEffect(() => {
     loadData();
-  }, [activeMonth]);
+  }, [activeMonth]); // Dependency on activeMonth
 
   const loadData = async () => {
     setLoading(true);
     try {
       // Load current month's records
       const currentRecords = await DataService.getMonthlyRecords(activeMonth);
-      setRecords(currentRecords);
+      // Sort records by date descending for display
+      const sortedCurrentRecords = currentRecords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setRecords(sortedCurrentRecords);
 
       // Load archived months data for the last 12 months
       const archived = await DataService.getMonthlyComparison(12);
-      setArchivedMonths(archived);
+      // Sort archived months from newest to oldest
+      const sortedArchived = archived.sort((a, b) => new Date(b.month).getTime() - new Date(a.month).getTime());
+      setArchivedMonths(sortedArchived);
     } catch (error) {
       console.error('Error loading reports:', error);
+      // Optionally, set an error message in state to display to the user
     } finally {
       setLoading(false);
     }
   };
 
-  const generatePDF = async (records: MilkRecord[], month: string) => {
+  const generatePDF = async (recordsToExport: MilkRecord[], month: string) => {
     try {
       const { jsPDF } = await import('jspdf');
       const { default: autoTable } = await import('jspdf-autotable');
-      
+
       const doc = new jsPDF();
-      const title = `Milk Production Report - ${format(new Date(month), 'MMMM yyyy')}`;
-      
+      const formattedMonth = format(parseISO(month), 'MMMM yyyy'); // Use parseISO for consistency
+      const title = `Milk Production Report - ${formattedMonth}`;
+
       doc.setFontSize(16);
+      doc.setTextColor(52, 58, 64); // Dark gray for title
       doc.text(title, 14, 15);
-  
-      const tableData = records.map(record => [
-        format(new Date(record.date), 'dd MMM yyyy'),
-        record.morning_milk.toString(),
-        record.evening_milk.toString(),
-        record.total_milk.toString()
+
+      const tableData = recordsToExport.map(record => [
+        format(parseISO(record.date), 'dd MMM yyyy'), // Use parseISO
+        record.morning_milk.toFixed(1), // Format to 1 decimal
+        record.evening_milk.toFixed(1), // Format to 1 decimal
+        record.total_milk.toFixed(1) // Format to 1 decimal
       ]);
-  
+
       autoTable(doc, {
         head: [['Date', 'Morning (L)', 'Evening (L)', 'Total (L)']],
         body: tableData,
         startY: 25,
         theme: 'grid',
-        styles: { fontSize: 8, cellPadding: 2 },
-        headStyles: { fillColor: [59, 130, 246], textColor: 255 }
+        styles: { fontSize: 9, cellPadding: 2, textColor: [52, 58, 64] }, // Darker text
+        headStyles: { fillColor: [76, 175, 80], textColor: 255, fontStyle: 'bold' }, // Green theme for header
+        columnStyles: {
+          1: { halign: 'right' }, // Align numbers to right
+          2: { halign: 'right' },
+          3: { halign: 'right' }
+        }
       });
-  
+
       // Add summary at the bottom
+      const finalY = (doc as any).lastAutoTable.finalY + 10; // Get y position after table
       const totals = {
-        morning: records.reduce((sum, r) => sum + r.morning_milk, 0),
-        evening: records.reduce((sum, r) => sum + r.evening_milk, 0),
-        total: records.reduce((sum, r) => sum + r.total_milk, 0)
+        morning: recordsToExport.reduce((sum, r) => sum + r.morning_milk, 0),
+        evening: recordsToExport.reduce((sum, r) => sum + r.evening_milk, 0),
+        total: recordsToExport.reduce((sum, r) => sum + r.total_milk, 0)
       };
-  
-      autoTable(doc, {
-        body: [[
-          'Monthly Totals',
-          totals.morning.toFixed(1),
-          totals.evening.toFixed(1),
-          totals.total.toFixed(1)
-        ]],
-        styles: { fontSize: 8, fontStyle: 'bold' },
-        theme: 'plain'
-      });
-  
-      doc.save(`milk-report-${month}.pdf`);
+
+      doc.setFontSize(10);
+      doc.setTextColor(52, 58, 64);
+      doc.text('Monthly Totals:', 14, finalY);
+      doc.setFontSize(10);
+      doc.setTextColor(76, 175, 80); // Green color for totals
+      doc.text(`Morning: ${totals.morning.toFixed(1)}L`, 14, finalY + 7);
+      doc.text(`Evening: ${totals.evening.toFixed(1)}L`, 14, finalY + 14);
+      doc.text(`Total: ${totals.total.toFixed(1)}L`, 14, finalY + 21);
+
+
+      doc.save(`milk-report-${formattedMonth.replace(/\s/g, '-')}.pdf`); // Clean filename
     } catch (error) {
       console.error('Error generating PDF:', error);
-      throw new Error('Failed to generate PDF');
+      // Provide user feedback
+      alert('Failed to generate PDF. Please try again.');
     }
   };
-  
-  const generateExcel = async (records: MilkRecord[], month: string) => {
+
+  const generateExcel = async (recordsToExport: MilkRecord[], month: string) => {
     try {
       const XLSX = await import('xlsx');
-      
+      const formattedMonth = format(parseISO(month), 'MMMM yyyy'); // Use parseISO for consistency
+
       const worksheet = XLSX.utils.json_to_sheet(
-        records.map(record => ({
-          Date: format(new Date(record.date), 'dd MMM yyyy'),
-          'Morning (L)': record.morning_milk,
-          'Evening (L)': record.evening_milk,
-          'Total (L)': record.total_milk
+        recordsToExport.map(record => ({
+          Date: format(parseISO(record.date), 'dd MMM yyyy'),
+          'Morning (L)': record.morning_milk.toFixed(1),
+          'Evening (L)': record.evening_milk.toFixed(1),
+          'Total (L)': record.total_milk.toFixed(1)
         }))
       );
-  
+
       // Add totals row
       const totals = {
-        morning: records.reduce((sum, r) => sum + r.morning_milk, 0),
-        evening: records.reduce((sum, r) => sum + r.evening_milk, 0),
-        total: records.reduce((sum, r) => sum + r.total_milk, 0)
+        morning: recordsToExport.reduce((sum, r) => sum + r.morning_milk, 0),
+        evening: recordsToExport.reduce((sum, r) => sum + r.evening_milk, 0),
+        total: recordsToExport.reduce((sum, r) => sum + r.total_milk, 0)
       };
-  
+
       XLSX.utils.sheet_add_json(worksheet, [{
         Date: 'Monthly Totals',
-        'Morning (L)': totals.morning,
-        'Evening (L)': totals.evening,
-        'Total (L)': totals.total
-      }], { origin: -1 });
-  
+        'Morning (L)': totals.morning.toFixed(1),
+        'Evening (L)': totals.evening.toFixed(1),
+        'Total (L)': totals.total.toFixed(1)
+      }], { origin: -1 }); // Append after last row
+
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Milk Records');
-      XLSX.writeFile(workbook, `milk-report-${month}.xlsx`);
+      XLSX.writeFile(workbook, `milk-report-${formattedMonth.replace(/\s/g, '-')}.xlsx`); // Clean filename
     } catch (error) {
       console.error('Error generating Excel:', error);
-      throw new Error('Failed to generate Excel file');
+      // Provide user feedback
+      alert('Failed to generate Excel file. Please try again.');
+    }
+  };
+
+  // Helper to fetch details for an archived month before export
+  const handleExportArchived = async (monthStr: string, type: 'pdf' | 'excel') => {
+    setLoading(true); // Indicate loading while fetching archived data
+    try {
+      const archivedRecords = await DataService.getMonthlyRecords(monthStr); // Fetch full records for the month
+      if (type === 'pdf') {
+        await generatePDF(archivedRecords, monthStr);
+      } else {
+        await generateExcel(archivedRecords, monthStr);
+      }
+    } catch (error) {
+      console.error(`Error exporting archived ${monthStr} (${type}):`, error);
+      alert(`Failed to export archived records for ${monthStr}.`);
+    } finally {
+      setLoading(false); // End loading
     }
   };
 
   return (
-    <>
-      <CattleNavbar />
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h1 className="text-2xl font-bold dark:text-white">Monthly Reports</h1>
-          
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <input
-                type="month"
-                value={activeMonth}
-                onChange={(e) => setActiveMonth(e.target.value)}
-                className="pr-10"
-              />
-              <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+    <div className="space-y-8 p-6 bg-gray-50 min-h-screen"> {/* Light theme background */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-3xl font-extrabold text-gray-800 flex items-center">
+          <BarChart className="h-8 w-8 mr-3 text-green-600" /> {/* Themed icon */}
+          Production Reports
+        </h1>
+
+        {/* Month Selection */}
+        <div className="relative">
+          <input
+            type="month"
+            value={activeMonth}
+            onChange={(e) => setActiveMonth(e.target.value)}
+            className="pl-4 pr-10 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 bg-white text-gray-800"
+          />
+          <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500 pointer-events-none" /> {/* Calendar icon */}
+        </div>
+      </div>
+
+      {/* Current Month Section */}
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
+        <div className="p-4 sm:p-6 border-b border-gray-100">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h2 className="text-xl font-semibold text-gray-800">
+              Current Month: {format(parseISO(activeMonth), 'MMMM yyyy')}
+            </h2>
+
+            <div className="flex flex-wrap gap-3">
+              <Button
+                variant="secondary" // Assuming these variants are styled green/white
+                icon={FileSpreadsheet}
+                onClick={() => generateExcel(records, activeMonth)}
+                disabled={loading || records.length === 0}
+              >
+                Export Excel
+              </Button>
+
+              <Button
+                variant="primary" // Assuming these variants are styled green/white
+                icon={FileText}
+                onClick={() => generatePDF(records, activeMonth)}
+                disabled={loading || records.length === 0}
+              >
+                Export PDF
+              </Button>
             </div>
           </div>
         </div>
 
-        {/* Current Month Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-          <div className="p-4 sm:p-6 border-b dark:border-gray-700">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <h2 className="text-lg font-semibold dark:text-white">
-                Records for {format(new Date(activeMonth), 'MMMM yyyy')}
-              </h2>
-              
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="secondary"
-                  icon={FileSpreadsheet}
-                  onClick={() => generateExcel(records, activeMonth)}
-                  disabled={loading || records.length === 0}
-                >
-                  Export Excel
-                </Button>
-                
-                <Button
-                  variant="primary"
-                  icon={FileText}
-                  onClick={() => generatePDF(records, activeMonth)}
-                  disabled={loading || records.length === 0}
-                >
-                  Export PDF
-                </Button>
-              </div>
-            </div>
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div> {/* Green spinner */}
           </div>
-
-          {loading ? (
-            <div className="p-8">
-              <SkeletonLoader height="h-8" width="w-1/3" className="mb-4" />
-              <SkeletonLoader height="h-10" count={8} />
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-800">
-                  <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Morning (kg)</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Evening (kg)</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total (kg)</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+        ) : records.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-green-50"> {/* Green table header */}
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-green-800 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-green-800 uppercase tracking-wider">Morning (L)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-green-800 uppercase tracking-wider">Evening (L)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-green-800 uppercase tracking-wider">Total (L)</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-100">
                 {records.map((record) => (
-                    <tr key={record.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {format(new Date(record.date), 'dd MMM yyyy')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.morning_milk}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.evening_milk}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.total_milk}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-gray-50">
-                  <tr>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Total</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {records.reduce((sum, record) => sum + record.morning_milk, 0).toFixed(2)}
+                  <tr key={record.id} className="hover:bg-gray-50 transition-colors duration-150">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">
+                      {format(parseISO(record.date), 'dd MMM yyyy')}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {records.reduce((sum, record) => sum + record.evening_milk, 0).toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {records.reduce((sum, record) => sum + record.total_milk, 0).toFixed(2)}
-                    </td>
-                    <td></td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{record.morning_milk.toFixed(1)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{record.evening_milk.toFixed(1)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-700 font-semibold">{record.total_milk.toFixed(1)}</td>
                   </tr>
-                </tfoot>
-              </table>
-            </div>
-          )}
+                ))}
+              </tbody>
+              <tfoot className="bg-green-100"> {/* Green footer for totals */}
+                <tr>
+                  <td className="px-6 py-4 whitespace-nowrap text-base font-bold text-green-800">Monthly Totals</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base font-bold text-green-800">
+                    {records.reduce((sum, record) => sum + record.morning_milk, 0).toFixed(1)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base font-bold text-green-800">
+                    {records.reduce((sum, record) => sum + record.evening_milk, 0).toFixed(1)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base font-bold text-green-800">
+                    {records.reduce((sum, record) => sum + record.total_milk, 0).toFixed(1)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center text-gray-600">
+            No milk records available for {format(parseISO(activeMonth), 'MMMM yyyy')}.
+          </div>
+        )}
+      </div>
+
+      {/* Archived Reports Section */}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100">
+        <div className="p-4 sm:p-6 border-b border-gray-100">
+          <h2 className="text-xl font-semibold text-gray-800">Past Monthly Summaries</h2>
         </div>
 
-        {/* Archived Reports Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-          <div className="p-4 sm:p-6 border-b dark:border-gray-700">
-            <h2 className="text-lg font-semibold dark:text-white">Archived Reports</h2>
-          </div>
-
-          <div className="divide-y dark:divide-gray-700">
-            {archivedMonths.map((month) => (
-              <div key={month.month} className="p-4 sm:p-6">
-                <div className="flex items-center justify-between">
+        <div className="divide-y divide-gray-100">
+          {archivedMonths.length > 0 ? (
+            archivedMonths.map((monthData) => (
+              <div key={monthData.month} className="p-4 sm:p-6 hover:bg-gray-50 transition-colors duration-150">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <button
-                    onClick={() => setExpandedMonth(expandedMonth === month.month ? null : month.month)}
-                    className="flex items-center text-left w-full"
+                    onClick={() => setExpandedMonth(expandedMonth === monthData.month ? null : monthData.month)}
+                    className="flex items-center text-left w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-green-500 rounded-md p-1 -ml-1"
                   >
-                    <span className="mr-2">
-                      {expandedMonth === month.month ? (
-                        <ChevronDown className="h-5 w-5" />
+                    <span className="mr-3 text-green-600"> {/* Icon color */}
+                      {expandedMonth === monthData.month ? (
+                        <ChevronDown className="h-6 w-6" />
                       ) : (
-                        <ChevronRight className="h-5 w-5" />
+                        <ChevronRight className="h-6 w-6" />
                       )}
                     </span>
                     <div className="flex-1">
-                      <h3 className="text-lg font-medium dark:text-white">{month.month}</h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Total: {month.total_milk.toFixed(1)}L | Daily Average: {month.average_daily.toFixed(1)}L
+                      <h3 className="text-lg font-medium text-gray-800">
+                        {format(parseISO(monthData.month), 'MMMM yyyy')}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Total: <span className="font-semibold text-green-700">{monthData.total_milk.toFixed(1)}L</span> | Avg Daily: <span className="font-semibold text-green-700">{monthData.average_daily.toFixed(1)}L</span>
                       </p>
                     </div>
                   </button>
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2 sm:ml-auto">
                     <Button
                       variant="secondary"
                       icon={FileSpreadsheet}
-                      onClick={() => generateExcel([], month.month)}
+                      onClick={() => handleExportArchived(monthData.month, 'excel')}
+                      disabled={loading}
                       size="sm"
                     >
                       Excel
@@ -262,7 +299,8 @@ const Reports = () => {
                     <Button
                       variant="primary"
                       icon={FileText}
-                      onClick={() => generatePDF([], month.month)}
+                      onClick={() => handleExportArchived(monthData.month, 'pdf')}
+                      disabled={loading}
                       size="sm"
                     >
                       PDF
@@ -270,47 +308,37 @@ const Reports = () => {
                   </div>
                 </div>
 
-                {expandedMonth === month.month && (
-                  <div className="mt-4 pl-7">
-                    <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded">
-                        <dt className="text-sm text-gray-500 dark:text-gray-400">Morning Total</dt>
-                        <dd className="text-lg font-medium dark:text-white">{month.morning_total.toFixed(1)}L</dd>
-                      </div>
-                      <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded">
-                        <dt className="text-sm text-gray-500 dark:text-gray-400">Evening Total</dt>
-                        <dd className="text-lg font-medium dark:text-white">{month.evening_total.toFixed(1)}L</dd>
-                      </div>
-                      <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded">
-                        <dt className="text-sm text-gray-500 dark:text-gray-400">Highest Day</dt>
-                        <dd className="text-lg font-medium dark:text-white">{month.highest_day.toFixed(1)}L</dd>
-                      </div>
-                      <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded">
-                        <dt className="text-sm text-gray-500 dark:text-gray-400">Lowest Day</dt>
-                        <dd className="text-lg font-medium dark:text-white">{month.lowest_day.toFixed(1)}L</dd>
-                      </div>
-                      <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded">
-                        <span className="text-sm text-gray-500 dark:text-gray-400">Label</span>
-                        <p className="text-gray-600 dark:text-gray-300">Secondary text</p>
-                      </div>
-                      <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded">
-                        <a className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">Link</a>
-                      </div>
-                    </dl>
+                {expandedMonth === monthData.month && (
+                  <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-100">
+                    <div className="p-3 rounded bg-white border border-gray-200 shadow-sm">
+                      <dt className="text-sm text-gray-600">Morning Total</dt>
+                      <dd className="text-lg font-semibold text-green-700">{monthData.morning_total.toFixed(1)} L</dd>
+                    </div>
+                    <div className="p-3 rounded bg-white border border-gray-200 shadow-sm">
+                      <dt className="text-sm text-gray-600">Evening Total</dt>
+                      <dd className="text-lg font-semibold text-green-700">{monthData.evening_total.toFixed(1)} L</dd>
+                    </div>
+                    <div className="p-3 rounded bg-white border border-gray-200 shadow-sm">
+                      <dt className="text-sm text-gray-600">Highest Day</dt>
+                      <dd className="text-lg font-semibold text-green-700">{monthData.highest_day.toFixed(1)} L</dd>
+                    </div>
+                    <div className="p-3 rounded bg-white border border-gray-200 shadow-sm">
+                      <dt className="text-sm text-gray-600">Lowest Day</dt>
+                      <dd className="text-lg font-semibold text-green-700">{monthData.lowest_day.toFixed(1)} L</dd>
+                    </div>
+                    {/* Placeholder for any additional data fields */}
                   </div>
                 )}
               </div>
-            ))}
-
-            {archivedMonths.length === 0 && (
-              <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-                No archived reports available
-              </div>
-            )}
-          </div>
+            ))
+          ) : (
+            <div className="p-8 text-center text-gray-600">
+              No archived reports available for the last 12 months.
+            </div>
+          )}
         </div>
       </div>
-    </>
+    </div>
   );
 };
 
