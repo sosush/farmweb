@@ -16,6 +16,8 @@ const Navbar: React.FC = () => {
     { name: 'Demand Analysis', href: '/demandanalysis' },
     { name: 'Plant Disease Prediction', href: '/plantdiseaseprediction' },
     { name: 'Crisp', href: '/crisp' },
+    { name: 'Krishi', href: '/krishi' },
+    { name: 'Livestock Disease', href: '/livestock' },
   ];
 
   return (

@@ -1,0 +1,104 @@
+[
+    {
+        "label": "Flask",
+        "importPath": "flask",
+        "description": "flask",
+        "isExtraImport": true,
+        "detail": "flask",
+        "documentation": {}
+    },
+    {
+        "label": "render_template",
+        "importPath": "flask",
+        "description": "flask",
+        "isExtraImport": true,
+        "detail": "flask",
+        "documentation": {}
+    },
+    {
+        "label": "request",
+        "importPath": "flask",
+        "description": "flask",
+        "isExtraImport": true,
+        "detail": "flask",
+        "documentation": {}
+    },
+    {
+        "label": "redirect",
+        "importPath": "flask",
+        "description": "flask",
+        "isExtraImport": true,
+        "detail": "flask",
+        "documentation": {}
+    },
+    {
+        "label": "CORS",
+        "importPath": "flask_cors",
+        "description": "flask_cors",
+        "isExtraImport": true,
+        "detail": "flask_cors",
+        "documentation": {}
+    },
+    {
+        "label": "cross_origin",
+        "importPath": "flask_cors",
+        "description": "flask_cors",
+        "isExtraImport": true,
+        "detail": "flask_cors",
+        "documentation": {}
+    },
+    {
+        "label": "pickle",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "pickle",
+        "description": "pickle",
+        "detail": "pickle",
+        "documentation": {}
+    },
+    {
+        "label": "pandas",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "pandas",
+        "description": "pandas",
+        "detail": "pandas",
+        "documentation": {}
+    },
+    {
+        "label": "numpy",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "numpy",
+        "description": "numpy",
+        "detail": "numpy",
+        "documentation": {}
+    },
+    {
+        "label": "index",
+        "kind": 2,
+        "importPath": "application",
+        "description": "application",
+        "peekOfCode": "def index():\n    Animals =sorted(Data['Animal'].unique())\n    Symptom_1s =sorted(Data['Symptom 1'].unique())\n    Symptom_2s = sorted(Data['Symptom 2'].unique())\n    Symptom_3s = sorted(Data['Symptom 3'].unique())\n    Animals.insert(0,'Select Animal')\n    Symptom_1s.insert(0, 'Select Symptom 1')\n    Symptom_2s.insert(0, 'Select Symptom 2')\n    Symptom_3s.insert(0, 'Select Symptom 3')\n    return render_template('index.html',Animals=Animals,Symptom_1s= Symptom_1s,Symptom_2s=Symptom_2s,Symptom_3s=Symptom_3s)",
+        "detail": "application",
+        "documentation": {}
+    },
+    {
+        "label": "predict",
+        "kind": 2,
+        "importPath": "application",
+        "description": "application",
+        "peekOfCode": "def predict():\n    try:\n        # Extract form data\n        Animal = request.form.get('Animal')\n        Age = request.form.get('Age')\n        Temperature = request.form.get('Temperature')\n        Symptom_1 = request.form.get('Symptom 1')\n        Symptom_2 = request.form.get('Symptom 2')\n        Symptom_3 = request.form.get('Symptom 3')\n        # Validate input",
+        "detail": "application",
+        "documentation": {}
+    },
+    {
+        "label": "cors",
+        "kind": 5,
+        "importPath": "application",
+        "description": "application",
+        "peekOfCode": "cors = CORS(app)\nmodel=pickle.load(open('livestock_logistic_Model.pkl','rb')) # bytestream data of logistic regression model  is loaded to model\nprint('Loaded model type:', type(model))\nprint('Loaded model:', model)\nData=pd.read_csv('Cleaned_Disease_Data.csv') # with help of pandas we are reading csv file\n@app.route('/',methods=['GET','POST'])\ndef index():\n    Animals =sorted(Data['Animal'].unique())\n    Symptom_1s =sorted(Data['Symptom 1'].unique())\n    Symptom_2s = sorted(Data['Symptom 2'].unique())",
+        "detail": "application",
+        "documentation": {}
+    }
+]

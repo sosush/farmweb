@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Livestock Disease Prediction</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        .main-card {
+            background: #fff;
+            border-radius: 1.5rem;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+            margin-top: 40px;
+            padding: 2.5rem 2rem 2rem 2rem;
+        }
+        .header-icon {
+            font-size: 3rem;
+            color: #4e73df;
+        }
+        .form-section {
+            margin-bottom: 1.5rem;
+        }
+        .form-label {
+            font-weight: 600;
+            color: #4e73df;
+        }
+        .btn-predict {
+            background: linear-gradient(90deg, #4e73df 0%, #1cc88a 100%);
+            color: #fff;
+            font-weight: 600;
+            border: none;
+            border-radius: 2rem;
+            transition: background 0.3s;
+        }
+        .btn-predict:hover {
+            background: linear-gradient(90deg, #1cc88a 0%, #4e73df 100%);
+        }
+        .result-section {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: #f8f9fc;
+            border-radius: 1rem;
+            box-shadow: 0 2px 8px rgba(78, 115, 223, 0.07);
+        }
+        .result-title {
+            color: #1cc88a;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        @media (max-width: 576px) {
+            .main-card {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-7 col-md-9">
+            <div class="main-card">
+                <div class="text-center mb-4">
+                    <span class="header-icon"><i class="fas fa-kiwi-bird"></i></span>
+                    <h1 class="mt-2" style="font-weight: 700; color: #4e73df;">Livestock Disease Prediction</h1>
+                    <p class="lead" style="color: #858796;">Predict the likelihood of disease in your livestock by entering the details below.</p>
+                </div>
+                <form method="post" accept-charset="utf-8" name="Modelform">
+                    <div class="form-section">
+                        <label class="form-label" for="Animal">Animal</label>
+                        <select class="form-control" id="Animal" name="Animal" required>
+                            {% for Animal in Animals %}
+                            <option value="{{ Animal }}">{{ Animal }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-section">
+                        <label class="form-label" for="Age">Age</label>
+                        <input type="number" class="form-control" id="Age" name="Age" placeholder="Enter Age" min="0" required>
+                    </div>
+                    <div class="form-section">
+                        <label class="form-label" for="Temperature">Temperature (&deg;C)</label>
+                        <input type="number" class="form-control" id="Temperature" name="Temperature" placeholder="Enter Temperature" step="0.1" required>
+                    </div>
+                    <div class="form-section">
+                        <label class="form-label" for="Symptom_1">Symptom 1</label>
+                        <select class="form-control" id="Symptom_1" name="Symptom 1" required>
+                            {% for Symptom_1 in Symptom_1s %}
+                            <option value="{{ Symptom_1 }}">{{ Symptom_1 }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-section">
+                        <label class="form-label" for="Symptom_2">Symptom 2</label>
+                        <select class="form-control" id="Symptom_2" name="Symptom 2" required>
+                            {% for Symptom_2 in Symptom_2s %}
+                            <option value="{{ Symptom_2 }}">{{ Symptom_2 }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-section">
+                        <label class="form-label" for="Symptom_3">Symptom 3</label>
+                        <select class="form-control" id="Symptom_3" name="Symptom 3" required>
+                            {% for Symptom_3 in Symptom_3s %}
+                            <option value="{{ Symptom_3 }}">{{ Symptom_3 }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-section text-center">
+                        <button type="submit" class="btn btn-predict btn-lg px-5"><i class="fas fa-stethoscope mr-2"></i>Predict Disease</button>
+                    </div>
+                </form>
+                <div class="result-section text-center">
+                    <div class="result-title">Prediction Result</div>
+                    <h4 id="prediction" class="mt-3"></h4>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script>
+    function form_handler(event) {
+        event.preventDefault();
+        var fd = new FormData(document.querySelector('form'));
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/predict', true);
+        document.getElementById('prediction').innerHTML = "<span class='text-info'><i class='fas fa-spinner fa-spin'></i> Predicting...</span>";
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState == XMLHttpRequest.DONE) {
+                document.getElementById('prediction').innerHTML = xhr.responseText;
+            }
+        };
+        xhr.send(fd);
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelector('form').addEventListener('submit', form_handler);
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
